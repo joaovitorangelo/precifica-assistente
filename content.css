@@ -1,0 +1,183 @@
+
+#precifica-assistente-root {
+  all: initial;
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 2147483647 !important;
+  pointer-events: none !important;
+  font-family: Arial, Helvetica, sans-serif !important;
+  color: #17212b !important;
+}
+
+#precifica-assistente-root *,
+#precifica-assistente-root *::before,
+#precifica-assistente-root *::after {
+  box-sizing: border-box !important;
+  font-family: Arial, Helvetica, sans-serif !important;
+}
+
+#precifica-assistente-root .pa-float {
+  pointer-events: auto !important;
+  position: fixed !important;
+  right: 24px !important;
+  bottom: 24px !important;
+  width: 58px !important;
+  height: 58px !important;
+  border: 0 !important;
+  border-radius: 50% !important;
+  background: #164e63 !important;
+  color: #fff !important;
+  box-shadow: 0 5px 22px #0003 !important;
+  font-size: 16px !important;
+  font-weight: 800 !important;
+  cursor: pointer !important;
+}
+
+#precifica-assistente-root .pa-float:hover {
+  background: #0e3b4b !important;
+}
+
+#precifica-assistente-root .pa-panel {
+  pointer-events: auto !important;
+  position: fixed !important;
+  right: 20px !important;
+  bottom: 94px !important;
+  width: 360px !important;
+  max-width: calc(100vw - 24px) !important;
+  max-height: min(78vh, 720px) !important;
+  overflow-y: auto !important;
+  background: #fff !important;
+  border: 1px solid #dce3e8 !important;
+  border-radius: 15px !important;
+  box-shadow: 0 12px 42px #0003 !important;
+  padding: 16px !important;
+  font-size: 13px !important;
+  line-height: 1.45 !important;
+}
+
+#precifica-assistente-root .pa-panel[hidden] {
+  display: none !important;
+}
+
+#precifica-assistente-root .pa-header {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  gap: 12px !important;
+  margin-bottom: 12px !important;
+}
+
+#precifica-assistente-root .pa-heading {
+  font-size: 17px !important;
+  font-weight: 700 !important;
+  margin: 0 !important;
+  color: #164e63 !important;
+}
+
+#precifica-assistente-root .pa-subtitle {
+  color: #687782 !important;
+  font-size: 11px !important;
+  margin-top: 3px !important;
+}
+
+#precifica-assistente-root .pa-close {
+  border: 0 !important;
+  background: #edf2f4 !important;
+  border-radius: 8px !important;
+  padding: 8px 10px !important;
+  cursor: pointer !important;
+  color: #263943 !important;
+}
+
+#precifica-assistente-root .pa-label {
+  display: block !important;
+  font-weight: 700 !important;
+  margin: 10px 0 4px !important;
+  color: #263943 !important;
+  font-size: 12px !important;
+}
+
+#precifica-assistente-root .pa-input {
+  display: block !important;
+  width: 100% !important;
+  min-height: 36px !important;
+  padding: 8px !important;
+  border: 1px solid #cbd5dc !important;
+  border-radius: 7px !important;
+  background: #fff !important;
+  color: #17212b !important;
+  font-size: 13px !important;
+}
+
+#precifica-assistente-root textarea.pa-input {
+  resize: vertical !important;
+  min-height: 58px !important;
+}
+
+#precifica-assistente-root .pa-image {
+  display: block !important;
+  max-width: 100% !important;
+  max-height: 110px !important;
+  object-fit: contain !important;
+  margin: 10px auto !important;
+  border-radius: 8px !important;
+}
+
+#precifica-assistente-root .pa-button {
+  width: 100% !important;
+  min-height: 38px !important;
+  margin-top: 8px !important;
+  border: 0 !important;
+  border-radius: 8px !important;
+  padding: 10px !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  cursor: pointer !important;
+  background: #164e63 !important;
+  color: #fff !important;
+}
+
+#precifica-assistente-root .pa-button.secondary {
+  background: #e8f0f3 !important;
+  color: #164e63 !important;
+}
+
+#precifica-assistente-root .pa-status {
+  white-space: pre-line !important;
+  min-height: 18px !important;
+  margin: 10px 0 0 !important;
+  font-size: 12px !important;
+  color: #164e63 !important;
+  overflow-wrap: anywhere !important;
+}
+
+#precifica-assistente-root .pa-report {
+  white-space: pre-wrap !important;
+  overflow-wrap: anywhere !important;
+  font-family: monospace !important;
+  font-size: 11px !important;
+  line-height: 1.6 !important;
+  color: #334155 !important;
+  background: #f1f5f9 !important;
+  border-radius: 8px !important;
+  padding: 10px !important;
+  margin: 8px 0 0 !important;
+}
+
+#precifica-assistente-root .pa-note {
+  margin-top: 10px !important;
+  font-size: 10px !important;
+  color: #687782 !important;
+}
+
+@media (max-width: 480px) {
+  #precifica-assistente-root .pa-panel {
+    right: 12px !important;
+    bottom: 82px !important;
+  }
+
+  #precifica-assistente-root .pa-float {
+    right: 16px !important;
+    bottom: 16px !important;
+  }
+}

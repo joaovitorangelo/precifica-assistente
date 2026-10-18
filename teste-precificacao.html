@@ -1,0 +1,248 @@
+
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Teste de Precificação</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 30px 16px;
+      font-family: Arial, sans-serif;
+      background: #f1f5f9;
+      color: #17212b;
+    }
+
+    .container {
+      max-width: 720px;
+      margin: auto;
+      padding: 28px;
+      background: white;
+      border-radius: 14px;
+      box-shadow: 0 4px 20px #00000010;
+    }
+
+    h1 {
+      margin-top: 0;
+      color: #164e63;
+    }
+
+    .subtitle {
+      color: #64748b;
+      margin-bottom: 25px;
+    }
+
+    .field {
+      margin-bottom: 18px;
+    }
+
+    label {
+      display: block;
+      font-weight: bold;
+      margin-bottom: 7px;
+    }
+
+    input,
+    textarea,
+    select {
+      width: 100%;
+      padding: 12px;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      font-size: 14px;
+    }
+
+    textarea {
+      min-height: 90px;
+      resize: vertical;
+    }
+
+    .preview {
+      margin-top: 12px;
+      padding: 12px;
+      background: #f8fafc;
+      border-radius: 8px;
+      text-align: center;
+    }
+
+    .preview img {
+      max-width: 100%;
+      max-height: 220px;
+      object-fit: contain;
+    }
+
+    .buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 24px;
+    }
+
+    button {
+      padding: 12px 16px;
+      border: none;
+      border-radius: 8px;
+      background: #164e63;
+      color: white;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    button.secondary {
+      background: #e2e8f0;
+      color: #17212b;
+    }
+
+    .notice {
+      margin-top: 22px;
+      padding: 14px;
+      border-radius: 8px;
+      background: #ecfeff;
+      color: #155e75;
+      font-size: 13px;
+    }
+
+    #result {
+      margin-top: 16px;
+      font-size: 13px;
+      overflow-wrap: anywhere;
+    }
+  </style>
+</head>
+
+<body>
+  <main class="container">
+    <h1>Teste de Precificação</h1>
+
+    <p class="subtitle">
+      Página fictícia para testar o preenchimento automático
+      do Precifica Assistente.
+    </p>
+
+    <form id="product-form">
+      <div class="field">
+        <label for="titulo">Título do produto</label>
+        <textarea
+          id="titulo"
+          name="titulo"
+          placeholder="O título será preenchido pela extensão."
+        ></textarea>
+      </div>
+
+      <div class="field">
+        <label for="preco">Preço (R$)</label>
+        <input
+          id="preco"
+          name="preco"
+          type="text"
+          placeholder="Ex.: 249,90"
+        >
+      </div>
+
+      <div class="field">
+        <label for="image_url">URL da imagem</label>
+        <input
+          id="image_url"
+          name="image_url"
+          type="url"
+          placeholder="https://exemplo.com/produto.jpg"
+        >
+      </div>
+
+      <div class="field">
+        <label for="categoria">Categoria</label>
+        <select id="categoria" name="categoria">
+          <option value="">Selecione uma categoria</option>
+          <option value="ferramentas">Ferramentas</option>
+          <option value="eletronicos">Eletrônicos</option>
+          <option value="casa">Casa e decoração</option>
+          <option value="cozinha">Cozinha</option>
+        </select>
+      </div>
+
+      <div class="preview">
+        <p>Prévia da imagem</p>
+        <img id="image-preview" alt="Prévia do produto" hidden>
+        <p id="image-placeholder">Nenhuma imagem carregada.</p>
+      </div>
+
+      <div class="buttons">
+        <button type="button" id="preview-button">
+          Atualizar prévia
+        </button>
+
+        <button type="reset" class="secondary">
+          Limpar formulário
+        </button>
+      </div>
+    </form>
+
+    <div class="notice">
+      <strong>Como testar:</strong>
+      use o botão flutuante do Precifica Assistente para capturar
+      dados de um anúncio e depois clique em
+      “Preencher campos desta página”.
+      O formulário não envia dados para nenhum servidor.
+    </div>
+
+    <p id="result" role="status"></p>
+  </main>
+
+  <script>
+    const form = document.getElementById("product-form");
+    const imageInput = document.getElementById("image_url");
+    const imagePreview = document.getElementById("image-preview");
+    const placeholder = document.getElementById("image-placeholder");
+    const result = document.getElementById("result");
+
+    document.getElementById("preview-button").addEventListener(
+      "click",
+      updatePreview
+    );
+
+    function updatePreview() {
+      const url = imageInput.value.trim();
+
+      imagePreview.hidden = true;
+      placeholder.hidden = false;
+
+      if (!url) {
+        placeholder.textContent = "Nenhuma URL informada.";
+        return;
+      }
+
+      imagePreview.onload = () => {
+        imagePreview.hidden = false;
+        placeholder.hidden = true;
+        result.textContent = "Prévia carregada.";
+      };
+
+      imagePreview.onerror = () => {
+        imagePreview.hidden = true;
+        placeholder.hidden = false;
+        placeholder.textContent = "Não foi possível carregar a imagem.";
+      };
+
+      imagePreview.src = url;
+    }
+
+    imageInput.addEventListener("change", updatePreview);
+
+    form.addEventListener("reset", () => {
+      setTimeout(() => {
+        imagePreview.hidden = true;
+        imagePreview.removeAttribute("src");
+        placeholder.hidden = false;
+        placeholder.textContent = "Nenhuma imagem carregada.";
+        result.textContent = "Formulário limpo.";
+      }, 0);
+    });
+  </script>
+</body>
+</html>
