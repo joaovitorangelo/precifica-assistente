@@ -17,104 +17,142 @@
       fillAll: { alt: true, shift: true, key: "v" }
     },
 
+    // fields: {
+    //   title: {
+    //     enabled: true,
+    //     label: "Título",
+    //     selectors: [
+    //       "#titulo",
+    //       "#title",
+    //       'input[name="titulo"]',
+    //       'textarea[name="titulo"]',
+    //       'input[name="title"]',
+    //       'textarea[name="title"]',
+    //       '[data-field="title"]'
+    //     ],
+    //     labels: [
+    //       /título do produto/i,
+    //       /^título$/i,
+    //       /^nome do produto$/i
+    //     ],
+    //     type: "text"
+    //   },
+
+    //   price: {
+    //     enabled: true,
+    //     label: "Preço",
+    //     selectors: [
+    //       "#preco",
+    //       "#price",
+    //       'input[name="preco"]',
+    //       'input[name="price"]',
+    //       '[data-field="price"]'
+    //     ],
+    //     labels: [
+    //       /preço do produto/i,
+    //       /^preço$/i,
+    //       /^valor$/i
+    //     ],
+    //     type: "text"
+    //   },
+
+    //   image: {
+    //     enabled: true,
+    //     label: "Foto / URL da imagem",
+    //     selectors: [
+    //       "#image_url",
+    //       "#imageUrl",
+    //       "#foto_url",
+    //       "#imagem_url",
+    //       'input[name="image_url"]',
+    //       'input[name="imageUrl"]',
+    //       'input[name="foto_url"]',
+    //       'input[name="imagem_url"]',
+    //       '[data-field="image-url"]'
+    //     ],
+    //     labels: [
+    //       /url da imagem/i,
+    //       /link da imagem/i
+    //     ],
+    //     type: "url"
+    //   },
+
+    //   category: {
+    //     enabled: true,
+    //     label: "Categoria pai",
+    //     selectors: [
+    //       "#categoria",
+    //       "#category",
+    //       "#categoriaPai",
+    //       "#categoria_pai",
+    //       'select[name="categoria"]',
+    //       'select[name="category"]',
+    //       'select[name="categoriaPai"]',
+    //       'select[name="categoria_pai"]',
+    //       '[data-field="parent-category"]'
+    //     ],
+    //     labels: [
+    //       /categoria pai/i,
+    //       /^categoria$/i
+    //     ],
+    //     type: "select"
+    //   },
+
+    //   labelQuantity: {
+    //     enabled: false,
+    //     label: "Quantidade de etiquetas",
+    //     selectors: [
+    //       "#quantidadeEtiquetas",
+    //       "#quantidade_etiquetas",
+    //       "#labelQuantity",
+    //       "#label_quantity",
+    //       'input[name="quantidadeEtiquetas"]',
+    //       'input[name="quantidade_etiquetas"]',
+    //       'input[name="labelQuantity"]',
+    //       'input[name="label_quantity"]'
+    //     ],
+    //     labels: [
+    //       /quantidade de etiquetas/i,
+    //       /^quantidade$/i
+    //     ],
+    //     type: "text"
+    //   }
+    // },
+
     fields: {
       title: {
         enabled: true,
-        label: "Título",
-        selectors: [
-          "#titulo",
-          "#title",
-          'input[name="titulo"]',
-          'textarea[name="titulo"]',
-          'input[name="title"]',
-          'textarea[name="title"]',
-          '[data-field="title"]'
-        ],
-        labels: [
-          /título do produto/i,
-          /^título$/i,
-          /^nome do produto$/i
-        ],
+        label: "Nome",
+        selectors: [],
+        labels: [/^nome$/i],
         type: "text"
       },
-
       price: {
         enabled: true,
-        label: "Preço",
-        selectors: [
-          "#preco",
-          "#price",
-          'input[name="preco"]',
-          'input[name="price"]',
-          '[data-field="price"]'
-        ],
-        labels: [
-          /preço do produto/i,
-          /^preço$/i,
-          /^valor$/i
-        ],
+        label: "Preço base (R$)",
+        selectors: [],
+        labels: [/^preço base\s*\(r\$\)$/i],
         type: "text"
       },
-
       image: {
-        enabled: true,
-        label: "Foto / URL da imagem",
-        selectors: [
-          "#image_url",
-          "#imageUrl",
-          "#foto_url",
-          "#imagem_url",
-          'input[name="image_url"]',
-          'input[name="imageUrl"]',
-          'input[name="foto_url"]',
-          'input[name="imagem_url"]',
-          '[data-field="image-url"]'
-        ],
-        labels: [
-          /url da imagem/i,
-          /link da imagem/i
-        ],
-        type: "url"
+        enabled: false,
+        label: "Imagem do produto",
+        selectors: [],
+        labels: [],
+        type: "manual"
       },
-
       category: {
         enabled: true,
-        label: "Categoria pai",
-        selectors: [
-          "#categoria",
-          "#category",
-          "#categoriaPai",
-          "#categoria_pai",
-          'select[name="categoria"]',
-          'select[name="category"]',
-          'select[name="categoriaPai"]',
-          'select[name="categoria_pai"]',
-          '[data-field="parent-category"]'
-        ],
-        labels: [
-          /categoria pai/i,
-          /^categoria$/i
-        ],
+        label: "Categoria ML",
+        selectors: [],
+        labels: [/^categoria ml$/i],
         type: "select"
       },
-
       labelQuantity: {
-        enabled: false,
-        label: "Quantidade de etiquetas",
-        selectors: [
-          "#quantidadeEtiquetas",
-          "#quantidade_etiquetas",
-          "#labelQuantity",
-          "#label_quantity",
-          'input[name="quantidadeEtiquetas"]',
-          'input[name="quantidade_etiquetas"]',
-          'input[name="labelQuantity"]',
-          'input[name="label_quantity"]'
-        ],
-        labels: [
-          /quantidade de etiquetas/i,
-          /^quantidade$/i
-        ],
+        enabled: true,
+        label: "Quantidade",
+        selectors: [],
+        labels: [/^quantidade$/i],
         type: "text"
       }
     },
@@ -787,10 +825,69 @@
           );
         }
       }
+
+      // Usa o link capturado do anúncio.
+      const buscaRealizada = await buscarAnuncioPorLink(
+        data.sourceUrl
+      );
+
+      if (buscaRealizada) {
+        say("Dados copiados e busca do anúncio acionada.");
+      }
+
     } catch (error) {
       console.error("[Precifica Assistente]", error);
       say("Falha ao capturar o anúncio. Consulte o console.", true);
     }
+  }
+
+
+  async function buscarAnuncioPorLink(url) {
+    const link = String(url || "").trim();
+
+    if (!/^https?:\/\//i.test(link)) {
+      say("Link do anúncio inválido.", true);
+      return false;
+    }
+
+    const campos = [
+      ...document.querySelectorAll(".ds-search-input")
+    ].filter(isVisible);
+
+    if (campos.length !== 1) {
+      say(
+        "Não foi possível identificar um único campo de busca.",
+        true
+      );
+      return false;
+    }
+
+    const campo = campos[0];
+    const preenchimento = setNativeValue(campo, link);
+
+    if (!preenchimento.ok) {
+      say("Não foi possível preencher o link.", true);
+      return false;
+    }
+
+    const botoes = [
+      ...document.querySelectorAll("button")
+    ].filter(isVisible).filter(botao =>
+      botao.innerText.trim().toLowerCase() === "buscar"
+    );
+
+    if (botoes.length !== 1) {
+      say(
+        "Não foi possível identificar um único botão Buscar.",
+        true
+      );
+      return false;
+    }
+
+    botoes[0].click();
+
+    say("Link enviado para busca.");
+    return true;
   }
 
   // ============================================================

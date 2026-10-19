@@ -29,3 +29,36 @@ Extensão local para Chrome (Manifest V3). Captura título, preço e imagem de u
 
 ## Próxima etapa
 Para ajustar a captura e os seletores com segurança, precisamos conhecer apenas os nomes/labels dos campos da tela de precificação. Use dados fictícios e oculte informações internas antes de compartilhar uma captura de tela.
+
+
+
+Buscar via link
+classe ds-search-input
+(primeiro de tudo é inserir o link do anuncio nesse campo e clicar no button com o texto "Buscar"
+
+Nome
+label (texto do label)="Nome"
+tambem é um textarea o input
+
+Categoria
+label (texto do label)="Categoria ML "
+é um select
+
+Preço
+label (texto do label)="Preço base (R$)"
+é un input 
+
+Quantidade
+label (texto do label)="Quantidade"
+
+Botão de cadastro
+button (atributo "tittle")="Cadastrar + Adicionar ao Palete"
+
+a imagem é inserida após clicar em
+button atributo "title": Colar imagem manualmente e surgir um modal
+para dar ctrl + v no aria-label=Área para colar imagem
+
+e para definir a imagem basta clicar no botão com o texto "Usar imagem"
+
+e para finalizar o cadastro basta clicar no button com atributo title: Cadastrar + Adicionar ao Palete
+
