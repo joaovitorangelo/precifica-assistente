@@ -129,10 +129,10 @@
       },
       price: {
         enabled: true,
-        label: "Preço base (R$)",
+        label: "Preço original (ML)",
         selectors: [],
-        labels: [/^preço base\s*\(r\$\)$/i],
-        type: "text"
+        labels: [/^preço original\s*\(\s*ml\s*\)$/i],
+        type: "number"
       },
       image: {
         enabled: false,
@@ -154,6 +154,11 @@
         selectors: [],
         labels: [/^quantidade$/i],
         type: "text"
+      },
+      search: {
+        enabled: true,
+        inputSelector: "input.ds-search-input",
+        buttonText: "Buscar"
       }
     },
 
@@ -206,6 +211,18 @@
       <textarea class="pa-input" id="pa-title" rows="2"
         placeholder="Nome do produto"></textarea>
 
+      <label class="pa-label" for="pa-gtin">
+        GTIN / EAN do produto
+      </label>
+      <input
+        class="pa-input"
+        id="pa-gtin"
+        placeholder="GTIN-8, UPC-12, EAN-13 ou GTIN-14"
+      />
+      <button class="pa-button" id="pa-search-gtin">
+        Buscar GTIN com Gemini
+      </button>
+
       <label class="pa-label" for="pa-price">
         Preço de referência (R$)
       </label>
@@ -218,11 +235,23 @@
       <input class="pa-input" id="pa-image"
         placeholder="https://..." type="url">
 
-      <label class="pa-label" for="pa-category">
-        Categoria pai
+      <label class="pa-label" for="pa-category-level1">
+        Categoria ML — nível 1
       </label>
-      <input class="pa-input" id="pa-category"
-        placeholder="Ex.: Ferramentas">
+      <input
+        class="pa-input"
+        id="pa-category-level1"
+        placeholder="Categoria principal"
+      />
+
+      <label class="pa-label" for="pa-category-level2">
+        Categoria ML — nível 2
+      </label>
+      <input
+        class="pa-input"
+        id="pa-category-level2"
+        placeholder="Subcategoria"
+      />
 
       <label class="pa-label" for="pa-quantity">
         Quantidade de etiquetas
@@ -298,12 +327,14 @@
 
   function getDraft() {
     return {
-      title: $("pa-title").value.trim(),
-      price: $("pa-price").value.trim(),
-      imageUrl: $("pa-image").value.trim(),
-      category: $("pa-category").value.trim(),
-      labelQuantity: $("pa-quantity").value.trim(),
-      sourceUrl: $("pa-source").value.trim(),
+      title: $("pa-title")?.value?.trim() || "",
+      price: $("pa-price")?.value?.trim() || "",
+      imageUrl: $("pa-image")?.value?.trim() || "",
+      category: $("pa-category-level1")?.value?.trim() || "",
+      categoryLevel1: $("pa-category-level1")?.value?.trim() || "",
+      categoryLevel2: $("pa-category-level2")?.value?.trim() || "",
+      labelQuantity: $("pa-quantity")?.value?.trim() || "1",
+      sourceUrl: $("pa-source")?.value?.trim() || "",
       updatedAt: new Date().toISOString()
     };
   }
@@ -312,7 +343,8 @@
     $("pa-title").value = data.title || "";
     $("pa-price").value = data.price || "";
     $("pa-image").value = data.imageUrl || "";
-    $("pa-category").value = data.category || "";
+    $("pa-category-level1").value = data.categoryLevel1 || "";
+    $("pa-category-level2").value = data.categoryLevel2 || "";
     $("pa-quantity").value =
       data.labelQuantity || CONFIG.defaultLabelQuantity;
     $("pa-source").value = data.sourceUrl || "";
@@ -387,7 +419,12 @@
 
     let price =
       meta('meta[property="product:price:amount"]') ||
-      meta('meta[itemprop="price"]');
+      meta('meta[property="og:price:amount"]') ||
+      meta('meta[itemprop="price"]') ||
+      meta('meta[name="price"]') ||
+      document.querySelector('[itemprop="price"]')?.getAttribute("content") ||
+      document.querySelector('[itemprop="price"]')?.innerText ||
+      "";
 
     const objects = [];
 
@@ -447,7 +484,9 @@
     }
 
     if (price) {
-      price = String(price).replace(/[^\d,.-]/g, "").trim();
+      price = String(price)
+        .replace(/[^\d,.-]/g, "")
+        .trim();
 
       if (/^\d+\.\d{2}$/.test(price)) {
         price = price.replace(".", ",");
@@ -462,13 +501,292 @@
       imageUrl = "";
     }
 
+    const categories = extractMercadoLivreCategory();
+
     return {
       title,
       price,
       imageUrl,
-      category: "",
+      category: categories.categoryLevel1 || "",
+      categoryLevel1: categories.categoryLevel1 || "",
+      categoryLevel2: categories.categoryLevel2 || "",
       labelQuantity: CONFIG.defaultLabelQuantity,
       sourceUrl: location.href
+    };
+  }
+
+
+  const GEMINI_API_KEY = "AIzaSyC2Z8HMBJdr_MZ8GabPd5-JFvf528SerV0";
+  const GEMINI_MODEL = "gemini-3.8-flash";
+
+  function isValidGTIN(code) {
+    if (!/^(?:\d{8}|\d{12,14})$/.test(code)) {
+      return false;
+    }
+
+    const digits = code.split("").map(Number);
+    const checkDigit = digits.pop();
+
+    let sum = 0;
+
+    for (let i = digits.length - 1, position = 0;
+      i >= 0;
+      i--, position++) {
+      sum += digits[i] * (position % 2 === 0 ? 3 : 1);
+    }
+
+    return (10 - (sum % 10)) % 10 === checkDigit;
+  }
+
+  async function searchGtinWithGemini() {
+    const title = $("pa-title").value.trim();
+    const sourceUrl = $("pa-source").value.trim();
+    const button = $("pa-search-gtin");
+
+    if (!GEMINI_API_KEY ||
+      GEMINI_API_KEY === "COLE_SUA_CHAVE_AQUI") {
+      say("Configure sua chave da API do Gemini no código.", true);
+      return;
+    }
+
+    if (!title) {
+      say("Capture ou informe o título do produto primeiro.", true);
+      return;
+    }
+
+    button.disabled = true;
+    say("Pesquisando GTIN na web com o Gemini...");
+
+    try {
+      const prompt = `
+Pesquise na web o código de barras GTIN/EAN deste produto.
+
+Título: ${title}
+Página de origem: ${sourceUrl || "Não informada"}
+
+Regras:
+- Pesquise o produto exato, incluindo marca, modelo e variante.
+- Priorize fabricante, catálogo oficial e fontes confiáveis.
+- Não invente nem deduza um GTIN sem evidência.
+- Não confunda códigos de modelos, cores, tamanhos ou kits diferentes.
+- Informe um candidato apenas se houver evidência de correspondência.
+- GTIN pode ter 8, 12, 13 ou 14 dígitos.
+- Se não encontrar evidência suficiente, diga "NÃO ENCONTRADO".
+- Cite as URLs das fontes que sustentam o resultado.
+
+Responda em português com:
+Produto identificado:
+GTIN candidato:
+Marca e modelo:
+Evidência:
+Fontes:
+Confiança: alta, média ou baixa.
+`;
+
+      const response = await fetch(
+        "https://generativelanguage.googleapis.com/v1beta/models/" +
+        GEMINI_MODEL + ":generateContent?key=" +
+        encodeURIComponent(GEMINI_API_KEY),
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            contents: [{
+              parts: [{ text: prompt }]
+            }],
+            tools: [{
+              google_search: {}
+            }],
+            generationConfig: {
+              temperature: 0.1,
+              maxOutputTokens: 1200
+            }
+          })
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          result.error?.message ||
+          `Erro HTTP ${response.status}`
+        );
+      }
+
+      const answer = (
+        result.candidates?.[0]?.content?.parts || []
+      )
+        .map(part => part.text || "")
+        .join("\n")
+        .trim();
+
+      if (!answer) {
+        throw new Error("O Gemini não retornou um resultado.");
+      }
+
+      // Extrai possíveis códigos de 8, 12, 13 ou 14 dígitos.
+      const candidates = [
+        ...new Set(
+          answer.match(/(?<!\d)\d{8}|\d{12,14}(?!\d)/g) || []
+        )
+      ];
+
+      // Não preenche automaticamente códigos sem dígito
+      // verificador válido.
+      const valid = candidates.filter(isValidGTIN);
+
+      if (valid.length === 1) {
+        $("pa-gtin").value = valid[0];
+      } else {
+        $("pa-gtin").value = "";
+      }
+
+      // Exibe a resposta e as fontes para conferência.
+      let sources = [];
+
+      for (const candidate of result.candidates || []) {
+        const chunks =
+          candidate.groundingMetadata?.groundingChunks || [];
+
+        for (const chunk of chunks) {
+          const web = chunk.web;
+
+          if (web?.uri) {
+            sources.push({
+              title: web.title || web.uri,
+              uri: web.uri
+            });
+          }
+        }
+      }
+
+      sources = sources.filter(
+        (source, index, array) =>
+          array.findIndex(item => item.uri === source.uri) === index
+      );
+
+      const sourceText = sources.length
+        ? "\n\nFontes retornadas pela pesquisa:\n" +
+        sources.map(source =>
+          `${source.title}\n${source.uri}`
+        ).join("\n\n")
+        : "\n\nNenhuma fonte verificável foi retornada pela ferramenta.";
+
+      report.textContent =
+        answer + sourceText +
+        (valid.length === 1
+          ? "\n\nGTIN candidato preenchido. Confirme se pertence à variante exata."
+          : "\n\nNenhum GTIN único com dígito verificador válido foi preenchido.");
+
+      report.hidden = false;
+
+      say(
+        valid.length === 1
+          ? "GTIN candidato encontrado. Confira as fontes antes de usar."
+          : "Pesquisa concluída, mas não foi possível validar um GTIN único.",
+        valid.length !== 1
+      );
+    } catch (error) {
+      console.error("[Precifica Assistente] Gemini:", error);
+      say("Erro na pesquisa do GTIN: " + error.message, true);
+    } finally {
+      button.disabled = false;
+    }
+  }
+
+  function extractMercadoLivreCategory() {
+    const clean = (value) =>
+      String(value || "").replace(/\s+/g, " ").trim();
+
+    const normalize = (value) =>
+      clean(value)
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLocaleLowerCase("pt-BR");
+
+    // Primeiro tenta a trilha de navegação do anúncio.
+    const selectors = [
+      'nav[aria-label*="breadcrumb" i] a',
+      ".ui-breadcrumb a",
+      ".andes-breadcrumb a",
+      'ol[class*="breadcrumb"] a'
+    ];
+
+    for (const selector of selectors) {
+      const links = [
+        ...document.querySelectorAll(selector)
+      ];
+
+      const names = links
+        .map((el) => clean(el.innerText))
+        .filter(Boolean);
+
+      if (names.length >= 2) {
+        // Usa os dois últimos itens da trilha,
+        // que normalmente representam as categorias mais específicas.
+        return {
+          categoryLevel1: names[names.length - 2],
+          categoryLevel2: names[names.length - 1]
+        };
+      }
+    }
+
+    // Fallback: procura BreadcrumbList no JSON-LD.
+    function visit(node) {
+      if (!node || typeof node !== "object") return null;
+
+      if (Array.isArray(node)) {
+        for (const item of node) {
+          const result = visit(item);
+          if (result) return result;
+        }
+        return null;
+      }
+
+      const types = Array.isArray(node["@type"])
+        ? node["@type"]
+        : [node["@type"]];
+
+      if (types.includes("BreadcrumbList")) {
+        const names = (node.itemListElement || [])
+          .map((item) =>
+            clean(item?.item?.name || item?.name)
+          )
+          .filter(Boolean);
+
+        if (names.length >= 2) {
+          return {
+            categoryLevel1: names[names.length - 2],
+            categoryLevel2: names[names.length - 1]
+          };
+        }
+      }
+
+      for (const value of Object.values(node)) {
+        const result = visit(value);
+        if (result) return result;
+      }
+
+      return null;
+    }
+
+    for (const script of document.querySelectorAll(
+      'script[type="application/ld+json"]'
+    )) {
+      try {
+        const result = visit(JSON.parse(script.textContent));
+        if (result) return result;
+      } catch {
+        // Ignora JSON inválido.
+      }
+    }
+
+    return {
+      categoryLevel1: "",
+      categoryLevel2: ""
     };
   }
 
@@ -574,6 +892,78 @@
     };
   }
 
+
+  function findOriginalPriceMLField() {
+    const normalize = (value) =>
+      String(value || "")
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/\s+/g, " ")
+        .trim()
+        .replace(/:$/, "")
+        .toLowerCase();
+
+    const labels = [...document.querySelectorAll("label")]
+      .filter((label) =>
+        /^preco original\s*\(\s*ml\s*\)$/.test(
+          normalize(label.innerText || label.textContent)
+        )
+      );
+
+    const matches = new Set();
+
+    for (const label of labels) {
+      // Associação explícita: <label for="...">
+      if (label.htmlFor) {
+        const associated = document.getElementById(label.htmlFor);
+
+        if (
+          associated instanceof HTMLInputElement &&
+          associated.type !== "hidden" &&
+          isVisible(associated)
+        ) {
+          matches.add(associated);
+        }
+      }
+
+      // Associação HTML nativa: label.control
+      const control = label.control;
+
+      if (
+        control instanceof HTMLInputElement &&
+        control.type !== "hidden" &&
+        isVisible(control)
+      ) {
+        matches.add(control);
+      }
+
+      // Procura no contêiner do campo e em ancestrais próximos.
+      let container = label.parentElement;
+
+      for (let depth = 0; container && depth < 4; depth++) {
+        const inputs = [
+          ...container.querySelectorAll(
+            'input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"])'
+          )
+        ].filter(isVisible);
+
+        if (inputs.length === 1) {
+          matches.add(inputs[0]);
+          break;
+        }
+
+        // Evita escolher um campo quando o contêiner tem vários inputs.
+        if (inputs.length > 1) break;
+
+        container = container.parentElement;
+      }
+    }
+
+    return matches.size === 1
+      ? [...matches][0]
+      : null;
+  }
+
   // ============================================================
   // 7. PREENCHIMENTO DOS CAMPOS
   // ============================================================
@@ -667,6 +1057,78 @@
     };
   }
 
+
+  function fillOriginalPriceML(value) {
+    const field = findOriginalPriceMLField();
+
+    if (!field) {
+      return {
+        field: "Preço original (ML)",
+        ok: false,
+        reason: "Campo não encontrado ou identificação ambígua."
+      };
+    }
+
+    let normalized = String(value ?? "")
+      .trim()
+      .replace(/\s/g, "")
+      .replace(/^R\$/i, "");
+
+    // Formato brasileiro: 1.249,90
+    if (/^\d{1,3}(?:\.\d{3})+,\d{2}$/.test(normalized)) {
+      normalized = normalized.replace(/\./g, "").replace(",", ".");
+    } else if (/^\d+,\d{1,2}$/.test(normalized)) {
+      normalized = normalized.replace(",", ".");
+    } else if (/^\d{1,3}(?:,\d{3})+\.\d{2}$/.test(normalized)) {
+      // Formato americano: 1,249.90
+      normalized = normalized.replace(/,/g, "");
+    }
+
+    const price = Number(normalized);
+
+    if (
+      normalized === "" ||
+      !Number.isFinite(price) ||
+      price < 0
+    ) {
+      return {
+        field: "Preço original (ML)",
+        ok: false,
+        reason: `Preço ausente ou inválido: "${value}".`
+      };
+    }
+
+    const setter = Object.getOwnPropertyDescriptor(
+      HTMLInputElement.prototype,
+      "value"
+    )?.set;
+
+    if (!setter) {
+      return {
+        field: "Preço original (ML)",
+        ok: false,
+        reason: "Não foi possível preencher o campo."
+      };
+    }
+
+    field.focus();
+    setter.call(field, price.toFixed(2));
+
+    field.dispatchEvent(
+      new Event("input", { bubbles: true })
+    );
+    field.dispatchEvent(
+      new Event("change", { bubbles: true })
+    );
+    field.blur();
+
+    return {
+      field: "Preço original (ML)",
+      ok: true,
+      reason: `Valor aplicado: ${price.toFixed(2)}.`
+    };
+  }
+
   function fillConfiguredField(key, value) {
     const config = CONFIG.fields[key];
 
@@ -709,6 +1171,10 @@
     );
 
     results.push(
+      fillOriginalPriceML(data.price)
+    );
+
+    results.push(
       fillConfiguredField("image", data.imageUrl)
     );
 
@@ -739,39 +1205,32 @@
   // 8. COPIAR TODOS OS DADOS
   // ============================================================
 
+
   async function copyAllProductData() {
     try {
-      // 1. Captura automaticamente os dados da página atual.
       const captured = extractFromPage();
-
-      // 2. Preserva os dados que o usuário já informou no painel.
       const current = getDraft();
 
       const data = {
-        title: captured.title || "",
-        price: captured.price || "",
-        imageUrl: captured.imageUrl || "",
-        category: current.category || "",
-        labelQuantity: current.labelQuantity ||
-          CONFIG.defaultLabelQuantity,
+        ...captured,
+        category: current.category || captured.category || "",
+        categoryLevel1:
+          captured.categoryLevel1 || current.categoryLevel1 || "",
+        categoryLevel2:
+          captured.categoryLevel2 || current.categoryLevel2 || "",
+        labelQuantity:
+          current.labelQuantity || CONFIG.defaultLabelQuantity,
         sourceUrl: location.href,
         updatedAt: new Date().toISOString()
       };
 
-      // 3. Atualiza o painel com os dados capturados.
-      render(data);
-
-      // 4. Valida se a captura encontrou informações úteis.
       if (!data.title && !data.price && !data.imageUrl) {
-        say(
-          "Não consegui capturar os dados deste anúncio. " +
-          "Verifique se a página do produto está aberta.",
-          true
-        );
+        say("Não consegui capturar os dados deste anúncio.", true);
         return;
       }
 
-      // 5. Tenta salvar, sem impedir a cópia se falhar.
+      render(data);
+
       try {
         if (storageAvailable()) {
           await chrome.storage.local.set({
@@ -780,28 +1239,28 @@
         }
       } catch (error) {
         console.warn(
-          "[Precifica Assistente] Não foi possível salvar o rascunho.",
+          "[Precifica Assistente] Erro ao salvar rascunho:",
           error
         );
       }
 
-      // 6. Monta um único bloco com todos os dados.
       const text = [
         `Título: ${data.title}`,
         `Preço: ${data.price}`,
         `Imagem: ${data.imageUrl}`,
         `Categoria: ${data.category}`,
+        `Categoria ML nível 1: ${data.categoryLevel1}`,
+        `Categoria ML nível 2: ${data.categoryLevel2}`,
         `Quantidade de etiquetas: ${data.labelQuantity}`,
         `Anúncio: ${data.sourceUrl}`
       ].join("\n");
 
-      // 7. Copia o bloco para a área de transferência.
       try {
         await navigator.clipboard.writeText(text);
-        say("Anúncio capturado e todos os dados copiados!");
+        say("Dados capturados e copiados, incluindo as categorias disponíveis.");
       } catch (error) {
         console.warn(
-          "[Precifica Assistente] Clipboard API indisponível.",
+          "[Precifica Assistente] Clipboard indisponível:",
           error
         );
 
@@ -809,122 +1268,397 @@
         area.value = text;
         area.style.position = "fixed";
         area.style.left = "-9999px";
-        area.style.top = "0";
         root.appendChild(area);
         area.select();
 
         const copied = document.execCommand("copy");
         area.remove();
 
-        if (copied) {
-          say("Anúncio capturado e todos os dados copiados!");
-        } else {
-          say(
-            "Dados capturados, mas a cópia foi bloqueada pelo navegador.",
-            true
-          );
-        }
+        say(
+          copied
+            ? "Dados capturados e copiados."
+            : "Dados capturados, mas a cópia foi bloqueada.",
+          !copied
+        );
       }
-
-      // Usa o link capturado do anúncio.
-      const buscaRealizada = await buscarAnuncioPorLink(
-        data.sourceUrl
-      );
-
-      if (buscaRealizada) {
-        say("Dados copiados e busca do anúncio acionada.");
-      }
-
     } catch (error) {
       console.error("[Precifica Assistente]", error);
-      say("Falha ao capturar o anúncio. Consulte o console.", true);
+      say("Erro ao capturar: " + (error?.message || String(error)), true);
     }
   }
 
 
-  async function buscarAnuncioPorLink(url) {
-    const link = String(url || "").trim();
+  function normalizeCategory(value) {
+    return String(value || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .toLocaleLowerCase("pt-BR");
+  }
 
-    if (!/^https?:\/\//i.test(link)) {
-      say("Link do anúncio inválido.", true);
-      return false;
-    }
-
-    const campos = [
-      ...document.querySelectorAll(".ds-search-input")
-    ].filter(isVisible);
-
-    if (campos.length !== 1) {
-      say(
-        "Não foi possível identificar um único campo de busca.",
-        true
-      );
-      return false;
-    }
-
-    const campo = campos[0];
-    const preenchimento = setNativeValue(campo, link);
-
-    if (!preenchimento.ok) {
-      say("Não foi possível preencher o link.", true);
-      return false;
-    }
-
-    const botoes = [
-      ...document.querySelectorAll("button")
-    ].filter(isVisible).filter(botao =>
-      botao.innerText.trim().toLowerCase() === "buscar"
+  function findCategorySelect(labelText) {
+    const labels = [...document.querySelectorAll("label")].filter(
+      (label) =>
+        normalizeCategory(label.innerText).includes(
+          normalizeCategory(labelText)
+        )
     );
 
-    if (botoes.length !== 1) {
-      say(
-        "Não foi possível identificar um único botão Buscar.",
-        true
-      );
-      return false;
+    const matches = labels
+      .map((label) => label.parentElement?.querySelector("select"))
+      .filter((select) => select && select.isConnected);
+
+    return matches.length === 1 ? matches[0] : null;
+  }
+
+  function selectExactOption(select, requestedText) {
+    if (!select || !requestedText) return false;
+
+    const normalize = (value) =>
+      normalizeCategory(value)
+        .replace(/\s*\[[^\]]*\]/g, "")
+        .replace(/\s*\([^)]*\)/g, "")
+        .trim();
+
+    const target = normalize(requestedText);
+
+    const matches = [...select.options].filter((option) => {
+      if (option.value === "" || option.disabled) return false;
+
+      const optionText = normalize(option.textContent);
+
+      return optionText === target;
+    });
+
+    if (matches.length !== 1) return false;
+
+    const setter = Object.getOwnPropertyDescriptor(
+      HTMLSelectElement.prototype,
+      "value"
+    )?.set;
+
+    if (!setter) return false;
+
+    setter.call(select, matches[0].value);
+
+    select.dispatchEvent(new Event("input", { bubbles: true }));
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+
+    return select.value === matches[0].value;
+  }
+
+  function waitForCategoryOptions(select, timeout = 8000) {
+    return new Promise((resolve) => {
+      const started = Date.now();
+
+      function check() {
+        if (!select || !select.isConnected) {
+          resolve(false);
+          return;
+        }
+
+        const available = [...select.options].some(
+          (option) => option.value !== "" && !option.disabled
+        );
+
+        if (!select.disabled && available) {
+          resolve(true);
+          return;
+        }
+
+        if (Date.now() - started >= timeout) {
+          resolve(false);
+          return;
+        }
+
+        setTimeout(check, 200);
+      }
+
+      check();
+    });
+  }
+
+  async function fillProductCategories(data) {
+    const results = [];
+
+    const primary = findCategorySelect(
+      "Categoria primária (nível 1 ML)"
+    );
+
+    const secondary = findCategorySelect(
+      "Categoria secundária (nível 2"
+    );
+
+    if (!primary || !secondary) {
+      return [{
+        field: "Categorias ML",
+        ok: false,
+        reason: "Não encontrei os dois seletores na tela atual."
+      }];
     }
 
-    botoes[0].click();
+    if (!data.categoryLevel1) {
+      results.push({
+        field: "Categoria nível 1",
+        ok: false,
+        reason: "Categoria não capturada. Escolha manualmente."
+      });
 
-    say("Link enviado para busca.");
-    return true;
+      return results;
+    }
+
+    const primaryOK = selectExactOption(
+      primary,
+      data.categoryLevel1
+    );
+
+    results.push({
+      field: "Categoria nível 1",
+      ok: primaryOK,
+      reason: primaryOK
+        ? "Opção exata selecionada."
+        : "Não existe correspondência exata. Nenhuma opção foi escolhida."
+    });
+
+    if (!primaryOK) return results;
+
+    const ready = await waitForCategoryOptions(secondary);
+
+    if (!ready) {
+      results.push({
+        field: "Categoria nível 2",
+        ok: false,
+        reason: "As opções não carregaram ou não estão disponíveis."
+      });
+
+      return results;
+    }
+
+    if (!data.categoryLevel2) {
+      results.push({
+        field: "Categoria nível 2",
+        ok: false,
+        reason: "Subcategoria não capturada. Escolha manualmente."
+      });
+
+      return results;
+    }
+
+    const secondaryOK = selectExactOption(
+      secondary,
+      data.categoryLevel2
+    );
+
+    results.push({
+      field: "Categoria nível 2",
+      ok: secondaryOK,
+      reason: secondaryOK
+        ? "Opção exata selecionada."
+        : "Não existe correspondência exata. Nenhuma opção foi escolhida."
+    });
+
+    return results;
+  }
+
+  // ============================================================
+  // BUSCAR PRODUTO NO SISTEMA
+  // ============================================================
+
+
+  async function searchProduct() {
+    try {
+      const data = getDraft();
+
+      // Usa a Fonte do anúncio (sourceUrl) como termo de pesquisa.
+      const sourceUrl = data.sourceUrl?.trim();
+
+      if (!sourceUrl) {
+        say(
+          "Preencha o campo Fonte do anúncio antes de pesquisar.",
+          true
+        );
+        $("pa-source").focus();
+        return;
+      }
+
+      const input = document.querySelector("input.ds-search-input");
+
+      if (!input) {
+        throw new Error(
+          "Campo de pesquisa do As Vezes Tem não encontrado."
+        );
+      }
+
+      const button = [...document.querySelectorAll("button")].find(
+        (btn) =>
+          btn.textContent.trim() === "Buscar" &&
+          btn.classList.contains("bg-brand-500")
+      );
+
+      if (
+        !button ||
+        input.disabled ||
+        input.readOnly ||
+        button.disabled
+      ) {
+        throw new Error("Campo ou botão Buscar indisponível.");
+      }
+
+      const setter = Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype,
+        "value"
+      )?.set;
+
+      if (!setter) {
+        throw new Error(
+          "Não foi possível preencher a pesquisa."
+        );
+      }
+
+      input.focus();
+      setter.call(input, sourceUrl);
+
+      input.dispatchEvent(
+        new Event("input", { bubbles: true })
+      );
+      input.dispatchEvent(
+        new Event("change", { bubbles: true })
+      );
+
+      if (input.value !== sourceUrl) {
+        throw new Error(
+          "A Fonte do anúncio não foi aplicada à pesquisa."
+        );
+      }
+
+      button.click();
+
+      say(
+        "Pesquisa iniciada usando a Fonte do anúncio. Aguardando os campos de categoria..."
+      );
+
+      // Aguarda a interface carregar os seletores de categoria.
+      const started = Date.now();
+      let primary = null;
+      let secondary = null;
+
+      while (Date.now() - started < 10000) {
+        primary = findCategorySelect(
+          "Categoria primária (nível 1 ML)"
+        );
+
+        secondary = findCategorySelect(
+          "Categoria secundária (nível 2"
+        );
+
+        if (primary && secondary) break;
+
+        await new Promise((resolve) =>
+          setTimeout(resolve, 250)
+        );
+      }
+
+      if (!primary || !secondary) {
+        say(
+          "Busca enviada. Os campos de categoria não apareceram; confira a tela.",
+          true
+        );
+        return;
+      }
+
+
+      const results = [];
+
+      // A busca já foi enviada e os campos de categoria apareceram.
+      // Agora tenta preencher o título e o preço.
+      results.push(
+        fillConfiguredField("title", data.title)
+      );
+
+      results.push(
+        fillOriginalPriceML(data.price)
+      );
+
+      // Preenche as categorias depois do título e do preço.
+      const categoryResults = await fillProductCategories(data);
+      results.push(...categoryResults);
+
+      showReport(results);
+
+      const successful = results.filter(
+        (item) => item.ok
+      ).length;
+
+      const pending = results.length - successful;
+
+      say(
+        `Busca concluída: ${successful} campo(s) preenchido(s), ` +
+        `${pending} pendente(s). Confira o relatório.`,
+        pending > 0
+      );
+    } catch (error) {
+      console.error(
+        "[Precifica Assistente] Erro na pesquisa:",
+        error
+      );
+
+      say(
+        "Falha ao pesquisar: " +
+        (error?.message || String(error)),
+        true
+      );
+    }
   }
 
   // ============================================================
   // 9. PREENCHER TODOS OS CAMPOS
   // ============================================================
 
+
   async function fillAllProductFields() {
     const data = getDraft();
 
-    if (!data.title && !data.price && !data.imageUrl) {
-      say("Não há dados para preencher.", true);
+    if (!data.sourceUrl) {
+      say(
+        "Preencha a Fonte do anúncio antes de pesquisar.",
+        true
+      );
+      $("pa-source").focus();
+      return;
+    }
+
+    if (!data.title && !data.price) {
+      say(
+        "Capture o anúncio ou informe o título e o preço antes de preencher.",
+        true
+      );
       return;
     }
 
     try {
-      const results = fillPage(data);
-      const success = results.filter((item) => item.ok).length;
-      const pending = results.length - success;
+      // A busca acontece primeiro.
+      // searchProduct preencherá título, preço e categorias
+      // depois que a tela de destino estiver pronta.
+      await searchProduct();
 
-      showReport(results);
-
-      say(
-        `${success} campo(s) preenchido(s); ` +
-        `${pending} pendente(s). Confira o relatório.`
-      );
-
-      // Não bloqueia o preenchimento se o armazenamento falhar.
+      // Salva o rascunho sem bloquear o preenchimento.
       try {
         await saveDraft();
-      } catch {
-        say(
-          "Campos processados, mas não foi possível salvar o rascunho.",
-          true
+      } catch (error) {
+        console.warn(
+          "[Precifica Assistente] Erro ao salvar:",
+          error
         );
       }
-    } catch {
-      say("Falha ao preencher. Confira os seletores configurados.", true);
+    } catch (error) {
+      console.error("[Precifica Assistente]", error);
+
+      say(
+        "Falha ao preencher os campos: " +
+        (error?.message || String(error)),
+        true
+      );
     }
   }
 
@@ -982,7 +1716,8 @@
   });
 
   $("pa-fill").addEventListener("click", () => {
-    fillAllProductFields().catch(() => {
+    fillAllProductFields().catch(error => {
+      console.error("[Precifica Assistente]", error);
       say("Falha ao preencher os campos.", true);
     });
   });
@@ -1014,6 +1749,10 @@
     }
   });
 
+  $("pa-search-gtin").addEventListener("click", () => {
+    searchGtinWithGemini();
+  });
+
   // ============================================================
   // 11. ATALHOS GLOBAIS
   // Alt + Shift + A = copiar todos os dados
@@ -1037,7 +1776,8 @@
     if (key === CONFIG.shortcuts.fillAll.key) {
       event.preventDefault();
 
-      fillAllProductFields().catch(() => {
+      fillAllProductFields().catch(error => {
+        console.error("[Precifica Assistente]", error);
         say("Falha ao preencher os campos.", true);
       });
     }
